@@ -6,6 +6,8 @@ import time
 from collections import defaultdict
 from . import mask as maskUtils
 import copy
+import matplotlib.pyplot as plt
+from sklearn import metrics
 
 class COCOeval:
     # Interface for evaluating detection on the Microsoft COCO dataset.
@@ -419,7 +421,7 @@ class COCOeval:
         toc = time.time()
         print('DONE (t={:0.2f}s).'.format( toc-tic))
 
-    def summarize(self):
+    def summarize(self, plot_pr_curves=False, save_pr_curves=None):
         '''
         Compute and display summary metrics for evaluation results.
         Note this functin can *only* be applied on the default parameter setting
@@ -495,6 +497,38 @@ class COCOeval:
         elif iouType == 'keypoints':
             summarize = _summarizeKps
         self.stats = summarize()
+
+        def _plot_pr_curves():
+            p = self.eval['params']
+            precision = self.eval['precision']
+            T, R, K, A, M = precision.shape
+            fig, ax = plt.subplots(figsize=(9.6, 2.8), ncols=A, sharex=True, sharey=True)
+            lines = ['-', '--', ':']
+            for a in range(A):
+                i = 0
+                for t in range(T):
+                    iou_thr = p.iouThrs[t]
+                    if not iou_thr in [0.25, 0.5, 0.75]:
+                        continue
+                    label = '{:.2f} (auc={:.3f})'.format(iou_thr, metrics.auc(p.recThrs, precision[t, :, 0, a, 2]))
+                    title = 'area={}, maxDets={}'.format(p.areaRngLbl[a], p.maxDets[2])
+                    ax[a].plot(
+                        p.recThrs, precision[t, :, 0, a, 2],
+                        lines[i%len(lines)], lw=1, label=label
+                    )
+                    i += 1
+                ax[a].set_ylim(-0.05, 1.05)
+                ax[a].set_xlabel('Recall')
+                if a == 0:
+                    ax[a].set_ylabel('Precision')
+                ax[a].legend(fontsize=7, loc='lower left')
+                ax[a].set_title(title, fontsize=8)
+            fig.tight_layout()
+            if save_pr_curves:
+                fig.savefig(save_pr_curves)
+
+        if plot_pr_curves:
+            _plot_pr_curves()
 
     def __str__(self):
         self.summarize()
