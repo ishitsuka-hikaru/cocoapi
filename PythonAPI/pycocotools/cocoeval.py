@@ -503,25 +503,35 @@ class COCOeval:
             precision = self.eval['precision']
             T, R, K, A, M = precision.shape
             fig, ax = plt.subplots(figsize=(9.6, 2.8), ncols=A, sharex=True, sharey=True)
-            lines = ['-', '--', ':']
+            lines = ['-', '--', ':', '-.']
             for a in range(A):
                 i = 0
+                _AP = []
                 for t in range(T):
                     iou_thr = p.iouThrs[t]
-                    if not iou_thr in [0.25, 0.5, 0.75]:
-                        continue
-                    label = '{:.2f} (auc={:.3f})'.format(iou_thr, metrics.auc(p.recThrs, precision[t, :, 0, a, 2]))
-                    title = 'area={}, maxDets={}'.format(p.areaRngLbl[a], p.maxDets[2])
-                    ax[a].plot(
-                        p.recThrs, precision[t, :, 0, a, 2],
-                        lines[i%len(lines)], lw=1, label=label
-                    )
+                    if iou_thr in [0.25, 0.5, 0.75]:
+                        __AP = np.mean(precision[t, :, :, a, 2], axis=1)
+                        label = '{:.2f} (auc={:.3f})'.format(iou_thr, metrics.auc(p.recThrs, __AP))
+                        title = 'area={}, maxDets={}'.format(p.areaRngLbl[a], p.maxDets[2])
+                        ax[a].plot(
+                            p.recThrs, __AP,
+                            lines[i%len(lines)], lw=1, label=label
+                        )
                     i += 1
+                    _AP.append(np.mean(precision[t, :, :, a, 2], axis=1))  # mean cats
+                _mAP = np.mean(_AP, axis=0)  # mean iouThrs
+                ax[a].plot(
+                    p.recThrs, _mAP,
+                    lines[i%len(lines)], lw=1,
+                    label='{}:{} (auc={:.3f})'.format(
+                        p.iouThrs[0], p.iouThrs[-1], metrics.auc(p.recThrs, _mAP)
+                    ),
+                )
                 ax[a].set_ylim(-0.05, 1.05)
                 ax[a].set_xlabel('Recall')
                 if a == 0:
                     ax[a].set_ylabel('Precision')
-                ax[a].legend(fontsize=7, loc='lower left')
+                ax[a].legend(fontsize=6)
                 ax[a].set_title(title, fontsize=8)
             fig.tight_layout()
             if save_pr_curves:
